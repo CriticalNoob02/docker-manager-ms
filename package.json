@@ -1,5 +1,5 @@
 {
-  "name": "radar-docker-manager-api",
+  "name": "docker-manager-api",
   "version": "1.0.0",
   "main": "dist/server.js",
   "license": "MIT",
