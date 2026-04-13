@@ -1,4 +1,4 @@
-# radar-docker-manager-ms
+# docker-manager-ms
 
 API REST + WebSocket para gerenciamento local de containers Docker. Serve como backend do **docker-manager-fe**.
 
