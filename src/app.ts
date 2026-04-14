@@ -6,6 +6,7 @@ import volumeRoutes from "./modules/volumes/volumes.routes";
 import networkRoutes from "./modules/networks/networks.routes";
 import composeRoutes from "./modules/compose/compose.routes";
 import metricsRoutes from "./modules/metrics/metrics.routes";
+import learnRoutes from "./modules/learn/learn.routes";
 import { AppError } from "./utils/errors";
 
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:3000";
@@ -22,6 +23,7 @@ app.use("/volumes", volumeRoutes);
 app.use("/networks", networkRoutes);
 app.use("/compose", composeRoutes);
 app.use("/metrics", metricsRoutes);
+app.use("/learn", learnRoutes);
 
 // Global error handler
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
