@@ -4,6 +4,7 @@ import * as controller from "./containers.controller";
 const router = Router();
 
 router.get("/", controller.list);
+router.post("/", controller.createContainer);
 router.get("/:id", controller.get);
 router.post("/:id/start", controller.startContainer);
 router.post("/:id/stop", controller.stopContainer);

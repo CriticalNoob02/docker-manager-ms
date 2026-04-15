@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import * as service from "./containers.service";
+import type { CreateContainerOptions } from "./containers.service";
 import { upsertDescription } from "./meta.service";
 
 export async function list(req: Request, res: Response, next: NextFunction) {
@@ -51,6 +52,16 @@ export async function removeContainer(req: Request, res: Response, next: NextFun
   try {
     await service.remove(req.params["id"] as string);
     res.status(204).send();
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function createContainer(req: Request, res: Response, next: NextFunction) {
+  try {
+    const options = req.body as CreateContainerOptions;
+    const id = await service.create(options);
+    res.status(201).json({ id });
   } catch (err) {
     next(err);
   }
