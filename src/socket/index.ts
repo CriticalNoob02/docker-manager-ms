@@ -2,7 +2,7 @@ import { Server as HttpServer } from "http";
 import { Server } from "socket.io";
 import logger from "../config/logger";
 import docker from "../config/docker";
-import { registerContainerHandlers, registerImageHandlers, cleanupSocketStreams } from "./handlers";
+import { registerContainerHandlers, registerImageHandlers, registerSwarmHandlers, cleanupSocketStreams } from "./handlers";
 
 const CORS_ORIGIN = process.env.CORS_ORIGIN || "http://localhost:3000";
 
@@ -18,8 +18,8 @@ export function initSocket(server: HttpServer) {
 
   const dockerNs = io.of("/docker");
 
-  // Broadcast container lifecycle events to all connected clients
-  docker.getEvents({ filters: { type: ["container"] } }, (err, stream) => {
+  // Broadcast container + swarm lifecycle events to all connected clients
+  docker.getEvents({ filters: { type: ["container", "service", "node"] } }, (err, stream) => {
     if (err || !stream) {
       logger.error("Não foi possível assinar eventos do Docker");
       return;
@@ -28,11 +28,20 @@ export function initSocket(server: HttpServer) {
     stream.on("data", (chunk: Buffer) => {
       try {
         const event = JSON.parse(chunk.toString("utf8"));
-        dockerNs.emit("container:event", {
-          action: event.Action,
-          id: event.Actor?.ID?.substring(0, 12) ?? "",
-          name: event.Actor?.Attributes?.name ?? "",
-        });
+        if (event.Type === "container") {
+          dockerNs.emit("container:event", {
+            action: event.Action,
+            id: event.Actor?.ID?.substring(0, 12) ?? "",
+            name: event.Actor?.Attributes?.name ?? "",
+          });
+        } else if (event.Type === "service" || event.Type === "node") {
+          dockerNs.emit("swarm:event", {
+            type: event.Type,
+            action: event.Action,
+            id: event.Actor?.ID?.substring(0, 12) ?? "",
+            name: event.Actor?.Attributes?.name ?? "",
+          });
+        }
       } catch {
         // skip malformed event
       }
@@ -48,6 +57,7 @@ export function initSocket(server: HttpServer) {
 
     registerContainerHandlers(io, socket);
     registerImageHandlers(io, socket);
+    registerSwarmHandlers(io, socket);
 
     socket.on("disconnect", (reason) => {
       cleanupSocketStreams(socket.id);

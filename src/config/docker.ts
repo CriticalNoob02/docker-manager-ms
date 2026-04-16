@@ -13,4 +13,13 @@ export async function pingDocker(): Promise<void> {
   }
 }
 
+export async function isSwarmActive(): Promise<boolean> {
+  try {
+    const info = await docker.swarmInspect();
+    return !!info?.ID;
+  } catch {
+    return false;
+  }
+}
+
 export default docker;
