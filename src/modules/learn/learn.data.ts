@@ -419,3 +419,251 @@ export const quizQuestions: QuizQuestion[] = [
     conceptSlug: "dockerfile",
   },
 ];
+
+// ─── Conceitos Swarm ─────────────────────────────────────────
+
+export const swarmConcepts: DockerConcept[] = [
+  {
+    slug: "swarm",
+    title: "Docker Swarm",
+    emoji: "🐝",
+    summary:
+      "Orquestrador nativo do Docker que transforma um grupo de hosts em um único cluster gerenciado, com alta disponibilidade e escalonamento automático.",
+    explanation:
+      "Docker Swarm é o modo de orquestração embutido no Docker Engine. Com um simples `docker swarm init`, o host atual vira um nó manager de um cluster. Outros hosts podem entrar como workers ou managers adicionais. A partir daí, você não gerencia mais containers individuais — você declara serviços, e o Swarm decide em quais nós rodá-los. O Swarm cuida de reiniciar tasks falhas, distribuir carga entre réplicas e atualizar serviços sem downtime (rolling updates).",
+    analogy:
+      "Pense no Swarm como um gerente de RH de uma empresa com várias filiais: você diz 'preciso de 5 atendentes' e ele distribui esse pessoal entre as filiais disponíveis, substituindo quem falta e rebalanceando quando uma filial fecha.",
+    commands: [
+      { cmd: "docker swarm init", desc: "Inicializa um novo cluster Swarm neste host (vira manager)" },
+      { cmd: "docker swarm init --advertise-addr <IP>", desc: "Inicializa especificando o IP para outros nós se conectarem" },
+      { cmd: "docker swarm join --token <token> <ip>:<porta>", desc: "Adiciona este host ao cluster como worker" },
+      { cmd: "docker swarm join-token worker", desc: "Exibe o comando e token para novos workers" },
+      { cmd: "docker swarm join-token manager", desc: "Exibe o comando e token para novos managers" },
+      { cmd: "docker swarm leave --force", desc: "Remove este host do cluster (--force necessário em managers)" },
+      { cmd: "docker info | grep Swarm", desc: "Verifica se o Swarm está ativo neste host" },
+    ],
+    tips: [
+      "Para alta disponibilidade, use número ímpar de managers (3 ou 5). Com 3 managers, o cluster tolera a falha de 1 sem perder quorum.",
+      "Nunca passe um número par de managers — 4 managers têm o mesmo tolerância a falhas que 3, mas mais overhead de consenso (Raft).",
+      "Em produção, managers não devem rodar workload. Use `docker node update --availability drain <manager>` para reservá-los só para gestão.",
+      "O Swarm usa o algoritmo Raft para consenso entre managers. Se o quorum for perdido, o cluster entra em modo read-only para proteger o estado.",
+    ],
+    relatedConcepts: ["swarm-node", "swarm-service", "swarm-stack", "swarm-overlay-network"],
+  },
+  {
+    slug: "swarm-node",
+    title: "Swarm Node",
+    emoji: "🖥️",
+    summary:
+      "Um host Docker participante do cluster. Nodes podem ser managers (controlam o cluster) ou workers (executam as tasks).",
+    explanation:
+      "Um cluster Swarm é composto por nós (nodes). Cada node roda o Docker Engine. Existem dois papéis: managers e workers. Managers mantêm o estado do cluster usando consenso Raft — eles aceitam comandos da CLI, schedulam tasks e monitoram a saúde do cluster. Workers apenas executam containers (tasks). Todo manager também é, por padrão, um worker. A disponibilidade de um node pode ser `active` (aceita tasks), `pause` (não recebe novas tasks) ou `drain` (tasks em execução são migradas para outros nodes).",
+    analogy:
+      "Managers são como supervisores de turno: tomam decisões, delegam trabalho e garantem que tudo está rodando. Workers são os operários: executam as tarefas recebidas sem se preocupar com a gestão geral.",
+    commands: [
+      { cmd: "docker node ls", desc: "Lista todos os nós do cluster com status e role" },
+      { cmd: "docker node inspect <id>", desc: "Exibe detalhes de um nó específico" },
+      { cmd: "docker node update --availability drain <id>", desc: "Coloca o nó em modo drain (migra tasks ativas)" },
+      { cmd: "docker node update --availability active <id>", desc: "Reativa o nó para receber tasks" },
+      { cmd: "docker node update --role manager <id>", desc: "Promove um worker a manager" },
+      { cmd: "docker node update --role worker <id>", desc: "Rebaixa um manager a worker" },
+      { cmd: "docker node rm <id>", desc: "Remove um nó do cluster (deve estar em estado down)" },
+    ],
+    tips: [
+      "Antes de fazer manutenção num nó (atualização de OS, reinicialização), sempre coloque-o em `drain` para migrar os containers sem interrupção de serviço.",
+      "O asterisco (*) em `docker node ls` indica o nó onde você está executando o comando.",
+      "Para remover um manager, primeiro rebaixe-o para worker (`--role worker`), depois faça `docker swarm leave` no próprio host.",
+      "Use labels nos nós (`docker node update --label-add tipo=banco <id>`) para criar restrições de placement e controlar em quais nós cada serviço roda.",
+    ],
+    relatedConcepts: ["swarm", "swarm-service", "swarm-task"],
+  },
+  {
+    slug: "swarm-service",
+    title: "Swarm Service",
+    emoji: "⚙️",
+    summary:
+      "Unidade de deploy no Swarm. Define a imagem, número de réplicas, portas e política de atualização — o Swarm mantém esse estado desejado automaticamente.",
+    explanation:
+      "No Swarm, você não cria containers diretamente — você cria serviços. Um serviço é uma declaração de estado desejado: 'quero 3 instâncias do nginx:1.25 ouvindo na porta 80'. O Swarm traduz esse serviço em tasks (containers) e os distribui pelos nós disponíveis. Se um container cair, o Swarm automaticamente cria um novo para manter as 3 réplicas. Existem dois modos: `replicated` (número fixo de réplicas distribuídas pelos nós) e `global` (exatamente 1 instância em cada nó — útil para agentes de monitoramento).",
+    analogy:
+      "Um serviço é como uma vaga de emprego anunciada: você define o perfil ('3 desenvolvedores React sênior') e o RH (Swarm) recruta e mantém essas vagas preenchidas. Se um funcionário sai, ele é substituído automaticamente.",
+    commands: [
+      { cmd: "docker service create --name web --replicas 3 -p 80:80 nginx", desc: "Cria um serviço com 3 réplicas" },
+      { cmd: "docker service ls", desc: "Lista todos os serviços com status de réplicas" },
+      { cmd: "docker service ps <nome>", desc: "Lista as tasks (containers) de um serviço" },
+      { cmd: "docker service scale web=5", desc: "Escala o serviço 'web' para 5 réplicas" },
+      { cmd: "docker service update --image nginx:1.26 web", desc: "Atualiza a imagem do serviço (rolling update)" },
+      { cmd: "docker service update --rollback web", desc: "Reverte para a versão anterior do serviço" },
+      { cmd: "docker service rm web", desc: "Remove o serviço e todas as suas tasks" },
+      { cmd: "docker service logs -f web", desc: "Acompanha os logs agregados de todas as réplicas" },
+    ],
+    tips: [
+      "Prefira sempre especificar a tag exata da imagem (ex.: nginx:1.25.3) em vez de `latest`. Isso garante deploys reproduzíveis e facilita rollbacks.",
+      "Configure `--update-parallelism` e `--update-delay` para controlar o ritmo do rolling update e evitar downtime durante atualizações.",
+      "Use `--restart-condition on-failure` com `--restart-max-attempts 3` para evitar loops de restart infinitos em serviços com bugs.",
+      "Serviços globais (`--mode global`) são ideais para ferramentas de observabilidade como Prometheus node-exporter ou Filebeat.",
+    ],
+    relatedConcepts: ["swarm", "swarm-node", "swarm-task", "swarm-stack", "swarm-overlay-network"],
+  },
+  {
+    slug: "swarm-task",
+    title: "Swarm Task",
+    emoji: "🔧",
+    summary:
+      "Unidade atômica de trabalho do Swarm. Cada task é um container em execução em um nó específico, representando uma réplica de um serviço.",
+    explanation:
+      "Uma task é o menor objeto do Swarm: um container + sua especificação + o nó onde está rodando. Quando você cria um serviço com 3 réplicas, o Swarm cria 3 tasks, cada uma em um nó diferente (quando possível). Tasks têm um ciclo de vida: `new → pending → assigned → preparing → running`. Se uma task falha, ela transita para `failed` ou `shutdown`, e o Swarm automaticamente cria uma nova task para substituí-la. Tasks completadas ou falhas são mantidas por um tempo para fins de diagnóstico (o histórico aparece no `docker service ps`).",
+    analogy:
+      "Se o serviço é a vaga de emprego, a task é o funcionário específico que ocupa essa vaga. Quando ele é demitido (container falha), a vaga continua existindo e um novo funcionário é contratado (nova task criada) para preenchê-la.",
+    commands: [
+      { cmd: "docker service ps <serviço>", desc: "Lista tasks do serviço com estado atual e histórico" },
+      { cmd: "docker service ps --filter 'desired-state=running' <serviço>", desc: "Mostra apenas tasks ativas" },
+      { cmd: "docker inspect <task-id>", desc: "Inspeciona detalhes de uma task específica" },
+      { cmd: "docker service ps --no-trunc <serviço>", desc: "Mostra erros sem truncar a mensagem" },
+    ],
+    tips: [
+      "Quando um serviço está com problemas, use `docker service ps --no-trunc <serviço>` para ver a mensagem de erro completa das tasks falhas.",
+      "Tasks não podem ser reiniciadas manualmente — para forçar um restart, escale para 0 e depois para o número original (`docker service scale web=0 && docker service scale web=3`).",
+      "O scheduler do Swarm usa uma estratégia de spread por padrão: distribui tasks em nós com menos carga. Isso pode ser customizado com constraints e preferences.",
+      "Tasks históricas (falhas, completadas) acumulam em `docker service ps`. Use `docker service ps --filter 'desired-state=shutdown'` para ver só as inativas.",
+    ],
+    relatedConcepts: ["swarm-service", "swarm-node"],
+  },
+  {
+    slug: "swarm-stack",
+    title: "Swarm Stack",
+    emoji: "📚",
+    summary:
+      "Grupo de serviços relacionados deployados juntos via arquivo Compose. É o equivalente do `docker compose up` no Swarm.",
+    explanation:
+      "Uma stack é a unidade de deploy multi-serviço do Swarm. Você escreve um arquivo `docker-compose.yml` (com a chave `deploy` para configurações específicas de Swarm) e faz o deploy com `docker stack deploy`. O Swarm cria todos os serviços, redes overlay e volumes definidos. Stacks simplificam o gerenciamento de aplicações complexas: você atualiza o arquivo YAML e faz um novo deploy para aplicar mudanças. Todos os recursos criados por uma stack recebem o prefixo do nome da stack (`minha-app_web`, `minha-app_db`).",
+    analogy:
+      "Uma stack é como um kit de montagem de uma sala de estar: o arquivo compose descreve sofá, mesa e estante — peças que funcionam juntas. O `docker stack deploy` monta tudo de uma vez, e `docker stack rm` desmonta tudo junto.",
+    commands: [
+      { cmd: "docker stack deploy -c compose.yml minha-app", desc: "Deploy da stack a partir de um arquivo Compose" },
+      { cmd: "docker stack ls", desc: "Lista todas as stacks com número de serviços" },
+      { cmd: "docker stack services minha-app", desc: "Lista os serviços da stack" },
+      { cmd: "docker stack ps minha-app", desc: "Lista as tasks de todos os serviços da stack" },
+      { cmd: "docker stack rm minha-app", desc: "Remove a stack e todos os seus serviços" },
+    ],
+    tips: [
+      "A chave `deploy` no Compose só é lida pelo Swarm (`docker stack deploy`) — o `docker compose up` ignora completamente essas configurações.",
+      "Para atualizar uma stack, edite o arquivo compose e execute `docker stack deploy` novamente com o mesmo nome — o Swarm aplica as mudanças incrementalmente.",
+      "Use `secrets` e `configs` do Swarm no lugar de variáveis de ambiente para dados sensíveis (senhas, certificados). Eles são injetados de forma segura nos containers.",
+      "Versão mínima recomendada do Compose file para Swarm é `3.8`, que inclui suporte completo a `deploy.rollback_config` e `deploy.update_config`.",
+    ],
+    relatedConcepts: ["swarm", "swarm-service", "swarm-overlay-network", "compose"],
+  },
+  {
+    slug: "swarm-overlay-network",
+    title: "Overlay Network",
+    emoji: "🕸️",
+    summary:
+      "Rede virtual que conecta containers em diferentes hosts físicos do cluster, como se estivessem na mesma LAN.",
+    explanation:
+      "O Docker Swarm usa redes do tipo `overlay` para permitir comunicação entre containers em nós diferentes. Uma overlay network encapsula o tráfego de rede usando VXLAN, criando um túnel entre os hosts. Do ponto de vista dos containers, eles estão todos na mesma rede local — podem se descobrir pelo nome do serviço (DNS interno) e se comunicar diretamente. O Swarm cria automaticamente a rede `ingress` para publicar portas ao mundo externo com load balancing interno. Você pode criar redes overlay customizadas para isolar grupos de serviços.",
+    analogy:
+      "Uma overlay network é como uma VPN corporativa: mesmo que os funcionários estejam em cidades diferentes, a VPN os coloca na mesma rede interna. Um funcionário pode ligar para o ramal de outro sem saber — e sem se importar — que estão fisicamente separados.",
+    commands: [
+      { cmd: "docker network create --driver overlay minha-rede", desc: "Cria uma rede overlay para serviços Swarm" },
+      { cmd: "docker network create --driver overlay --attachable minha-rede", desc: "Overlay que também aceita containers standalone" },
+      { cmd: "docker network ls", desc: "Lista todas as redes, incluindo as overlay do Swarm" },
+      { cmd: "docker network inspect ingress", desc: "Inspeciona a rede ingress do Swarm" },
+      { cmd: "docker service create --network minha-rede --name api minha-imagem", desc: "Cria serviço conectado à rede overlay" },
+    ],
+    tips: [
+      "Serviços na mesma overlay network podem se comunicar usando o nome do serviço como hostname — o DNS interno do Swarm resolve automaticamente.",
+      "A rede `ingress` é especial: ela implementa o routing mesh, que permite que qualquer nó do cluster receba tráfego na porta publicada, mesmo sem ter uma task rodando nele.",
+      "Crie redes overlay separadas para diferentes camadas da aplicação (ex.: `frontend-net`, `backend-net`, `db-net`) para isolamento e segurança.",
+      "Redes overlay só existem enquanto pelo menos um serviço que as usa estiver ativo. Após remover todos os serviços, a rede pode ser removida com `docker network rm`.",
+    ],
+    relatedConcepts: ["swarm", "swarm-service", "swarm-stack", "network"],
+  },
+];
+
+export const swarmQuiz: QuizQuestion[] = [
+  {
+    id: "sq1",
+    question: "Quantos nós manager são recomendados para um cluster Swarm com alta disponibilidade?",
+    options: [
+      "Sempre 1 — mais managers aumentam a latência sem benefício",
+      "Um número ímpar (3 ou 5) para garantir quorum Raft",
+      "Um número par para balancear a carga de gestão",
+      "Pelo menos 10 para suportar grandes workloads",
+    ],
+    correctIndex: 1,
+    explanation:
+      "O algoritmo Raft exige maioria simples (quorum) para tomar decisões. Com 3 managers, o cluster suporta a falha de 1 (2 de 3 ainda formam maioria). Com 5, suporta 2 falhas. Número par é problemático: 4 managers têm a mesma tolerância a falhas que 3 (precisam de 3 votos), mas com mais overhead.",
+    conceptSlug: "swarm",
+  },
+  {
+    id: "sq2",
+    question: "Qual a diferença fundamental entre um Swarm Service e um container standalone?",
+    options: [
+      "Serviços só rodam imagens do Docker Hub, containers rodam qualquer imagem",
+      "Serviços são declarativos — o Swarm mantém o estado desejado automaticamente; containers são imperativos",
+      "Serviços consomem menos memória que containers standalone",
+      "Não há diferença prática, são apenas nomes diferentes para a mesma coisa",
+    ],
+    correctIndex: 1,
+    explanation:
+      "Um container standalone existe enquanto você não o remover. Um serviço Swarm declara um estado desejado (ex.: '3 réplicas rodando') e o orquestrador garante que esse estado seja mantido continuamente — recriando tasks falhas, redistribuindo em nós disponíveis e aplicando updates de forma controlada.",
+    conceptSlug: "swarm-service",
+  },
+  {
+    id: "sq3",
+    question: "O que acontece quando você coloca um nó em modo `drain`?",
+    options: [
+      "O nó é removido permanentemente do cluster",
+      "O nó para de aceitar novas tasks e as tasks existentes são migradas para outros nós",
+      "O nó fica em modo somente-leitura e não pode mais executar comandos Docker",
+      "Todos os containers do nó são pausados até o modo ser revertido",
+    ],
+    correctIndex: 1,
+    explanation:
+      "O modo `drain` é usado para manutenção segura: o Swarm para de agendar novas tasks no nó e ativa o processo de migração das tasks existentes para outros nós disponíveis. O nó permanece no cluster (aparece em `docker node ls`) mas sem executar workload. Para retomar, basta mudar a disponibilidade para `active`.",
+    conceptSlug: "swarm-node",
+  },
+  {
+    id: "sq4",
+    question: "Qual é a diferença entre os modos `replicated` e `global` de um serviço Swarm?",
+    options: [
+      "Replicated roda em todos os nós, global roda num número fixo de nós",
+      "Replicated define um número fixo de réplicas distribuídas; global roda exatamente 1 instância em cada nó do cluster",
+      "Global é mais rápido que replicated para workloads de alta concorrência",
+      "Não há diferença funcional, são configurações de nomenclatura",
+    ],
+    correctIndex: 1,
+    explanation:
+      "No modo `replicated`, você especifica um número de réplicas e o Swarm as distribui pelos nós de forma a balancear a carga. No modo `global`, o Swarm garante exatamente 1 instância em cada nó — quando novos nós entram no cluster, uma task é criada automaticamente neles. Global é ideal para agentes de monitoramento, log collectors e ferramentas que precisam rodar em toda a infraestrutura.",
+    conceptSlug: "swarm-service",
+  },
+  {
+    id: "sq5",
+    question: "Como serviços em uma overlay network se descobrem e se comunicam entre si?",
+    options: [
+      "Precisam ser configurados manualmente com os IPs de cada nó do cluster",
+      "Usam variáveis de ambiente injetadas automaticamente com os IPs dos outros serviços",
+      "Pelo nome do serviço como hostname — o DNS interno do Swarm resolve automaticamente",
+      "Apenas através da rede ingress, que faz proxy de todas as comunicações internas",
+    ],
+    correctIndex: 2,
+    explanation:
+      "O Swarm inclui um servidor DNS interno. Quando dois serviços estão na mesma overlay network, um pode se conectar ao outro usando o nome do serviço como endereço (ex.: `http://api:3000`). O DNS resolve para o IP virtual do serviço (VIP), que faz load balancing entre as réplicas. Isso elimina a necessidade de service discovery externo para comunicação interna.",
+    conceptSlug: "swarm-overlay-network",
+  },
+  {
+    id: "sq6",
+    question: "O que é o routing mesh do Docker Swarm?",
+    options: [
+      "Um algoritmo para distribuir tasks de forma uniforme entre os nós",
+      "Um sistema que permite que qualquer nó do cluster receba tráfego em portas publicadas, mesmo sem ter uma task daquele serviço",
+      "Uma rede de backup usada quando a overlay network principal falha",
+      "O protocolo de consenso usado pelos managers para sincronizar o estado do cluster",
+    ],
+    correctIndex: 1,
+    explanation:
+      "O routing mesh é implementado pela rede `ingress` do Swarm. Quando uma porta é publicada (ex.: `-p 80:80`), todos os nós do cluster passam a aceitar tráfego nessa porta — mesmo nós sem nenhuma task daquele serviço. O tráfego é roteado internamente para uma task ativa. Isso simplifica o load balancing externo: qualquer IP do cluster pode ser usado como entry point.",
+    conceptSlug: "swarm-overlay-network",
+  },
+];

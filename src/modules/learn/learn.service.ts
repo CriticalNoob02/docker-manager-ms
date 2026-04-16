@@ -4,12 +4,15 @@
 // ──────────────────────────────────────────────────────────────
 
 import docker from "../../config/docker";
-import { concepts, quizQuestions } from "./learn.data";
+import { concepts, quizQuestions, swarmConcepts, swarmQuiz } from "./learn.data";
+
+const allConcepts = [...concepts, ...swarmConcepts];
+const allQuizQuestions = [...quizQuestions, ...swarmQuiz];
 
 // ─── Conceitos ───────────────────────────────────────────────
 
 export function listConcepts() {
-  return concepts.map(({ slug, title, emoji, summary, relatedConcepts }) => ({
+  return allConcepts.map(({ slug, title, emoji, summary, relatedConcepts }) => ({
     slug,
     title,
     emoji,
@@ -19,15 +22,15 @@ export function listConcepts() {
 }
 
 export function getConceptBySlug(slug: string) {
-  return concepts.find((c) => c.slug === slug) ?? null;
+  return allConcepts.find((c) => c.slug === slug) ?? null;
 }
 
 // ─── Quiz ─────────────────────────────────────────────────────
 
 export function getQuiz(conceptSlug?: string) {
   const questions = conceptSlug
-    ? quizQuestions.filter((q) => q.conceptSlug === conceptSlug)
-    : quizQuestions;
+    ? allQuizQuestions.filter((q) => q.conceptSlug === conceptSlug)
+    : allQuizQuestions;
 
   // Retorna as perguntas sem o correctIndex exposto — o frontend
   // submete a resposta e o backend valida (ver checkAnswer)
@@ -40,7 +43,7 @@ export function getQuiz(conceptSlug?: string) {
 }
 
 export function checkAnswer(questionId: string, answerIndex: number) {
-  const question = quizQuestions.find((q) => q.id === questionId);
+  const question = allQuizQuestions.find((q) => q.id === questionId);
   if (!question) return null;
 
   const correct = answerIndex === question.correctIndex;
